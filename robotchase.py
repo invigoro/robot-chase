@@ -17,16 +17,6 @@ while True:
     #sub = cv.absdiff(grayblur, img)
     sub = cv.subtract(img, grayblur)
 
-    #reduce colors
-    z = sub.reshape((-1,3))
-    z = np.float32(z)
-    criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    K = 16
-    ret, label, center = cv.kmeans(z, K, None, criteria, 10, cv.KMEANS_RANDOM_CENTERS)
-    center = np.uint8(center)
-    res = center[label.flatten()]
-    res2 = res.reshape((img.shape))
-
     #show results
     cv.imshow("Grayblur", grayblur)
     cv.imshow("Subtracted", sub)
