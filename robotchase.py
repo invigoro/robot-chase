@@ -13,6 +13,7 @@ HEADTILT = 4
 HEADTURN = 3
 
 degreeTot = 0
+direction = 1
 
 class Control():
     def __init__(self):
@@ -26,22 +27,25 @@ class Control():
     def forward(self):
         self.motors = 5000
         self.tango.setTarget(MOTORS, self.motors)
-        print(self.motors)
-        time.sleep(1)
+        print(str(self.motors) + " MOVE")
+        time.sleep(.5)
         self.motors = 6000
         self.tango.setTarget(MOTORS, self.motors)
     def left(self):
         self.turn += 1000
         self.tango.setTarget(TURN, self.turn)
-        time.sleep(0.5)
+        print("LEFT")
+        time.sleep(.25)
         self.turn -= 1000
         self.tango.setTarget(TURN, self.turn)
     def right(self):
         self.turn -= 1000
         self.tango.setTarget(TURN, self.turn)
-        time.sleep(0.5)
+        print("RIGHT")
+        time.sleep(.25)
         self.turn += 1000
         self.tango.setTarget(TURN, self.turn)
+
 
 controller = Control()
 
@@ -55,12 +59,14 @@ rawCapture = PiRGBArray(camera, size=(640, 480))
 kernel = np.ones((5,5), np.uint8)
 
 # allow the camera to warmup
-time.sleep(0.1)
+time.sleep(2)
 
 for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
     #get the current frame
     img = frame.array
     height, width, channel = img.shape
+    #img = img[int(height * 0.5):height, int(width/4):int(width*0.75)]
+    #height, width, channel = img.shape
     center = width / 2
 
     #make grayscale and avg blur
@@ -70,10 +76,10 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     #convert back to BGR and take difference
     #grayblur = cv.cvtColor(grayblur, cv.COLOR_GRAY2BGR)
     #sub = cv.absdiff(grayblur, img)
-    sub = cv.subtract(img, grayblur)
+    #sub = cv.subtract(img, grayblur)
 
     #get rid of noise
-    _, thresh = cv.threshold(grayblur, 220, 255, cv.THRESH_BINARY)
+    _, thresh = cv.threshold(grayblur, 180, 255, cv.THRESH_BINARY)
 
     #hsv = cv.cvtColor(thresh, cv.COLOR_BGR2HSV)
 
@@ -87,15 +93,18 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     #erase everything but red
     mask = cv.inRange(thresh, minBGR, maxBGR)'''
 
-    img_erosion = cv.erode(thresh, kernel, iterations=1)    #erode white
-    img_dilation = cv.dilate(img_erosion, kernel, iterations=2) #dilate black
+    img_erosion = cv.erode(thresh, kernel, iterations=4)    #erode white
+    img_dilation = cv.dilate(img_erosion, kernel, iterations=5) #dilate black
 
     #find COG and draw it
     moments = cv.moments(img_dilation, True)
+
+
     try:
         cx = int(moments['m10'] / moments['m00'])
         cy = int(moments['m01'] / moments['m00'])
         degreeTot = 0
+        direction = 1
         if abs(cx - center) < 30:
             #move forward
             controller.forward()
@@ -104,13 +113,33 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             controller.right()
         else:
             controller.left()
-
+        time.sleep(0.1)
     except:
         cx = 0
         cy = 0
-        
+        print("No detected line")
+        if degreeTot < -90:
+            print("Line Completed")
+            break
+        elif degreeTot > 90:
+            print("switching to left")
+            direction = -1
+            degreeTot = 90
+        elif direction == 1:
+            print("moving right")
+            controller.right()
+            degreeTot += direction * 10
+        else:
+            print("moving left")
+            controller.left()
+            degreeTot += direction * 10
+        time.sleep(0.2)
+
+
     print(str(cx) + " " + str(cy))
     cv.circle(img, (cx, cy), 8, (0,0,255), -1)
+
+
 
 
 
